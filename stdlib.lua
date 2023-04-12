@@ -1,6 +1,60 @@
-_G.Time = {}
-_G.Crypto = {}
-_G.Debug = {
+---@class Error
+---@field msg string
+Error = {}
+
+---@param msg string
+---@return Error
+function Error.new(msg)
+    local instance = {
+		msg = msg
+	}
+	setmetatable(instance, {__index=Error})
+    return instance
+end
+
+---@class Result: { ok: boolean, v: unknown|Error }
+---@field v unknown|Error
+---@field isOk boolean
+Result = {}
+
+---@param value unknown
+---@return Result
+function Result.ok(value)
+	---@type Result
+	local instance = {
+		isOk=true,
+		v=value
+	}
+	setmetatable(instance, {__index=Result})
+    return instance
+end
+
+---@param value string
+---@return Result
+function Result.err(value)
+	---@type Result
+	local instance = {
+		isOk=false,
+		v=Error.new(value)
+	}
+	setmetatable(instance, {__index=Result})
+    return instance
+end
+
+---@return Error
+function Result:asError()
+	return self.v --[[@as Error]]
+end
+
+---@generic T
+---@return T
+function Result:asOK()
+	return self.v --[[@as T]]
+end
+
+Time = {}
+Crypto = {}
+Debug = {
 	levels = {
 		[1] = "[FATAL] ",
 		[2] = "[error] ",
@@ -125,15 +179,110 @@ function table.map(t, func)
 	return r
 end
 
-function table.filter(t, func)
+--- Calls the `closure` function passed as parameter for each element of `t` with `t`'s values
+--- and indices as passed parameters 1 and 2, and returns a new table without the elements for
+--- which the result of `closure(value, key)` returned `false`. If the closure crashes, `filter`
+--- crashes too.
+---@param t table
+---@param closure function
+local function filter(t, closure)
 	local r = {}
 	for i,v in pairs(t) do
-		if func(v,i) then
+		local worked, result = pcall(closure, v, i)
+
+		if not worked then
+			error("Crash in the closure function " .. tostring(closure) .. ". " .. result)
+		elseif result then
 			r[i] = v
 		end
 	end
 	return r
 end
+table.filter = filter
+
+---Merge `t1`'s and `t2`'s indices into a new table
+---
+---if `t1` and `t2` both have an index in common, elements of `t1` take priority
+---@param t1 table
+---@param t2 table
+---@return table t3
+function table.union(t1, t2)
+	local t3 = {}
+	for i,v in pairs(t1) do
+		t3[i] = v
+	end
+	for i,v in pairs(t2) do
+		if (not t3[i]) then
+			t3[i] = v
+		end
+	end
+
+	return t3
+end
+
+---Returns a table containing the indices present in either `t1` or `t2` but not both.
+---
+---Does not care about values.
+---
+---> ```lua
+---> table.diff({foo=1, bar=2}, {bar=5, baz=3})
+---> >{foo=1,baz=3}
+---> -- bar having two different values is not checked. Only indices matter.
+---> ```
+---@param t1 table
+---@param t2 table
+---@return table
+function table.diff(t1, t2)
+	local t3 = {}
+	for i,v in pairs(t1) do
+		if (not t2[i]) then
+			t3[i] = v
+		end
+	end
+	for i,v in pairs(t2) do
+		if (not t1[i] and not t3[i]) then
+			t3[i] = v
+		end
+	end
+
+	return t3
+end
+
+--- Will compare the table's values against `value` if `value` is of a primitive type. If `value` is a table, a function, or userdata, `table.contains` will only compare their reference. `table.contains` does not handle recursiveness.
+---@param t table
+---@param value any
+---@return boolean
+function table.contains(t, value)
+	for _,v in pairs(t) do
+		if v == value then
+			return true
+		end
+	end
+
+	return false
+end
+
+local oldGetName = peripheral.getNames
+---`peripheral.getNames()` but with a filter argument that checks each peripheral's type against this value and only returns the matches
+---@param peripheralType string|nil
+local function getNamesFiltered(peripheralType)
+	if not peripheralType then return oldGetName() end
+
+	local ret = {}
+    local names = oldGetName()
+	if names then
+		for _,v in pairs(names) do
+			local types = {peripheral.getType(v)}
+
+			if table.contains(types, peripheralType) then
+				table.insert(ret, v)
+			end
+		end
+	end
+
+    return ret
+end
+peripheral.getNames = getNamesFiltered
 
 function printf(format, ...)
     return print(string.format(format, ...))
@@ -165,9 +314,7 @@ function Time.timestamp()
 end
 
 local function crc32()
-	--[[
-        Copyright (C) 2022 SafeteeWoW github.com/SafeteeWoW
-    /!\ This software has been altered from its original version, it is not the original
+	--[[	Copyright (C) 2022 SafeteeWoW github.com/SafeteeWoW
 
 	This software is provided 'as-is', without any express or implied
 	warranty.  In no event will the authors be held liable for any damages
@@ -429,7 +576,7 @@ if turtle ~= nil and turtle.turnTo == nil then
 	end
 	turtle.turnTo = turnTo
 
-	local function goto(x,y,z)
+	local function turtGoto(x,y,z)
 		local success = true
 		local oldDirection = turtle.facing
 
@@ -475,7 +622,7 @@ if turtle ~= nil and turtle.turnTo == nil then
 		turtle.turnTo(oldDirection)
 		return success
 	end
-	turtle.goto = goto
+	turtle["goto"] = turtGoto
 
 	old.turtleUp = turtle.up
 	local function up()
