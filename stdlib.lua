@@ -49,7 +49,7 @@ end
 ---@generic T
 ---@return T
 function Result:asOK()
-	return self.v --[[@as T]]
+	return self.v
 end
 
 Time = {}
@@ -470,7 +470,7 @@ local function crc32()
 end
 crc32()
 
-function duplicateTerm(term1, term2)
+function term.duplicate(term1, term2)
 	local both = {}
 	setmetatable(both, {
 		-- the __index override handles table accesses (both[key], both.key, ...)
