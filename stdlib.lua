@@ -52,6 +52,77 @@ function Result:asOK()
 	return self.v
 end
 
+---@alias Slot {name:string, count:number}
+
+---@class Inventory
+---@field protected contents Slot[]
+Inventory = {
+	DEFAULT_SIZE = 27
+}
+
+---Constructor
+---@param contents Slot[]
+---@return table
+function Inventory.new(contents)
+    local instance = {
+		contents = contents
+	}
+	setmetatable(instance, {__index=Inventory})
+    return instance
+end
+
+---
+---@param filter string
+---@return number
+function Inventory:count(filter)
+    local sum = 0
+    for _,v in pairs(self.contents) do
+		if (filter == nil or v.name == filter) then
+			sum = sum + v.count
+		end
+    end
+    return sum
+end
+
+---Finds an item in an inventory
+---@param name string
+---@return number|nil slot Slot number, nil if not found
+---@return table|nil item Full item table
+function Inventory:find(name)
+    for i,v in pairs(self.contents) do
+        if (v.name == name) then
+            return i,v
+        end
+    end
+end
+
+---Checks if the full item tally is 0
+---@return boolean
+function Inventory:isEmpty()
+	for _,v in pairs(self.contents) do
+		if v.count > 0 then
+			return false
+		end
+	end
+
+	return true
+end
+
+---Tally up the total number of items in every stack for each kind of item
+---@return {[string]: number}
+function Inventory:tally()
+	local tally = {}
+	for _,v in pairs(self.contents) do
+		if tally[v.name] then
+			tally[v.name] = tally[v.name] + v.count
+		else
+			tally[v.name] = v.count
+		end
+	end
+
+	return tally
+end
+
 Time = {}
 Crypto = {}
 Debug = {
@@ -506,34 +577,33 @@ function term.duplicate(term1, term2)
 	return both
 end
 
+---Copy a table's contents
+---@param t table
+---@param deepcopy boolean
+---@return table
+function table.clone(t, deepcopy)
+	if type(t) ~= "table" then
+		error("bad argument #1 to 'clone' (table expected, got" .. type(t) .. ")")
+	end
+
+	local r = {}
+	for i,v in pairs(t) do
+		if deepcopy and type(v) == "table" then
+			r[i] = table.clone(v, true)
+		else
+			r[i] = v
+		end
+	end
+
+	return r
+end
+
 function table.count(t)
     local n = 0
     for _,_ in pairs(t) do
         n = n+1
     end
     return n
-end
-
-
-function countItems(inventory, item)
-	local nSlots
-	if type(inventory.size) == "function" then
-		nSlots = inventory.size()
-	else
-		-- Turtle
-		nSlots = 16
-	end
-
-    local sum = 0
-    for i=1, nSlots do
-        local v = inventory.getItemDetail(i)
-        if v then
-            if (item == nil or v.name == item) then
-                sum = sum + v.count
-            end
-        end
-    end
-    return sum
 end
 
 if turtle ~= nil and turtle.turnTo == nil then
@@ -756,7 +826,16 @@ if turtle ~= nil and turtle.turnTo == nil then
 
 
 	function turtle.count(item)
-		return countItems(turtle, item)
+		local sum = 0
+		for i=1, 16 do
+			local v = turtle.getItemDetail(i)
+			if v then
+				if (item == nil or v.name == item) then
+					sum = sum + v.count
+				end
+			end
+		end
+		return sum
 	end
 end
 
