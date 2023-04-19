@@ -81,6 +81,20 @@ function Inventory.new(peripheralInstance)
     return instance
 end
 
+---Create a peripheral as if returned by peripheral.wrap()
+---@param inventory Slot[]
+---@return Inventory|nil
+function Inventory.fromTable(inventory)
+	local instance = {
+		contents=inventory
+	}
+	instance.list = function()
+		return instance.contents
+	end
+
+	return Inventory.new(instance)
+end
+
 function Inventory:getPeripheral()
 	return self.peripheralInstance
 end
