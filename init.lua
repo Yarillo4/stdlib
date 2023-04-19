@@ -155,6 +155,35 @@ function Inventory:tally()
 	return tally
 end
 
+---Test for equality between this inventory and another
+---@param other Inventory
+function Inventory:isEqual(other)
+	local c1 = self.accessor()
+	local c2 = table.clone(other.accessor(), true)
+
+	-- Compare every member of c1 against c2
+	-- If equal, gradually empty c2
+	for i,_ in pairs(c1) do
+		if c2[i] == nil then
+			return false
+		elseif c2[i].name ~= c1[i].name
+		    or c2[i].count ~= c1[i].count then
+			return false
+		else
+			c2[i] = nil
+		end
+	end
+
+	-- If both are equal, here c2 should be empty since we trashed its members that were also in c1
+	for i,_ in pairs(c2) do
+		if c2[i] ~= nil then
+			return false
+		end
+	end
+
+	return true
+end
+
 Time = {}
 Crypto = {}
 Debug = {
