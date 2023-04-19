@@ -55,18 +55,28 @@ end
 ---@alias Slot {name:string, count:number}
 
 ---@class Inventory
----@field protected contents Slot[]
+---@field protected accessor function
+---@field protected peripheral table
 Inventory = {
 	DEFAULT_SIZE = 27
 }
 
+---@alias Peripheral table
+
 ---Constructor
----@param contents Slot[]
----@return table
-function Inventory.new(contents)
+---@param peripheral Peripheral
+---@return Inventory|nil
+function Inventory.new(peripheral)
     local instance = {
-		contents = contents
+		peripheral=peripheral
 	}
+
+	if type(peripheral.list) == "function" then
+		instance.accessor = peripheral.list
+	else
+		return nil
+	end
+
 	setmetatable(instance, {__index=Inventory})
     return instance
 end
@@ -76,7 +86,8 @@ end
 ---@return number
 function Inventory:count(filter)
     local sum = 0
-    for _,v in pairs(self.contents) do
+	local contents = self.accessor()
+    for _,v in pairs(contents) do
 		if (filter == nil or v.name == filter) then
 			sum = sum + v.count
 		end
@@ -89,7 +100,8 @@ end
 ---@return number|nil slot Slot number, nil if not found
 ---@return table|nil item Full item table
 function Inventory:find(name)
-    for i,v in pairs(self.contents) do
+	local contents = self.accessor()
+    for i,v in pairs(contents) do
         if (v.name == name) then
             return i,v
         end
@@ -99,7 +111,8 @@ end
 ---Checks if the full item tally is 0
 ---@return boolean
 function Inventory:isEmpty()
-	for _,v in pairs(self.contents) do
+	local contents = self.accessor()
+	for _,v in pairs(contents) do
 		if v.count > 0 then
 			return false
 		end
@@ -112,7 +125,8 @@ end
 ---@return {[string]: number}
 function Inventory:tally()
 	local tally = {}
-	for _,v in pairs(self.contents) do
+	local contents = self.accessor()
+	for _,v in pairs(contents) do
 		if tally[v.name] then
 			tally[v.name] = tally[v.name] + v.count
 		else
@@ -366,7 +380,7 @@ function Time.timestamp()
 	if r then
 		local h = r.getResponseHeaders()
 		if h then
-			local debug_time = string.sub(h.Date, 18, 19) .. string.sub(h.Date, 21, 22) .. string.sub(h.Date, 24, 25)
+			-- local debug_time = string.sub(h.Date, 18, 19) .. string.sub(h.Date, 21, 22) .. string.sub(h.Date, 24, 25)
 			timestamp = 0
 			local h_in_s = tonumber(string.sub(h.Date, 18, 19))*3600
 			if h_in_s == nil then return end
