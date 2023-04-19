@@ -55,8 +55,8 @@ end
 ---@alias Slot {name:string, count:number}
 
 ---@class Inventory
----@field protected accessor function
----@field protected peripheral table
+---@field protected accessor fun(): Slot[] Accessor to the inventory, normally, peripheralInstance.list()
+---@field protected peripheralInstance Peripheral
 Inventory = {
 	DEFAULT_SIZE = 27
 }
@@ -64,21 +64,25 @@ Inventory = {
 ---@alias Peripheral table
 
 ---Constructor
----@param peripheral Peripheral
+---@param peripheralInstance Peripheral
 ---@return Inventory|nil
-function Inventory.new(peripheral)
+function Inventory.new(peripheralInstance)
     local instance = {
-		peripheral=peripheral
+		peripheralInstance=peripheralInstance
 	}
 
-	if type(peripheral.list) == "function" then
-		instance.accessor = peripheral.list
+	if type(peripheralInstance.list) == "function" then
+		instance.accessor = peripheralInstance.list
 	else
 		return nil
 	end
 
 	setmetatable(instance, {__index=Inventory})
     return instance
+end
+
+function Inventory:getPeripheral()
+	return self.peripheralInstance
 end
 
 ---
@@ -98,7 +102,7 @@ end
 ---Finds an item in an inventory
 ---@param name string
 ---@return number|nil slot Slot number, nil if not found
----@return table|nil item Full item table
+---@return Slot|nil item Full item slot table
 function Inventory:find(name)
 	local contents = self.accessor()
     for i,v in pairs(contents) do
