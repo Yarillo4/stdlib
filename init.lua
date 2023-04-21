@@ -52,7 +52,14 @@ function Result:asOK()
 	return self.v
 end
 
----@alias Slot {name:string, count:number}
+--- A non-cryptographic hash, in other words, a string representation of an object that can be used to test for equality
+---
+--- For instance,
+--- * two inventories containing the same slots in a different order should reduce to two equal Comparables
+--- * two recipes that have the exact same pattern should reduce down to two equal Comparables, 
+---@alias Comparable string
+
+---@alias Slot {name:Comparable, count:number}
 
 ---@class Inventory
 ---@field protected accessor fun(): Slot[] Accessor to the inventory, normally, peripheralInstance.list()
@@ -139,20 +146,43 @@ function Inventory:isEmpty()
 	return true
 end
 
----Tally up the total number of items in every stack for each kind of item
----@return {[string]: number}
-function Inventory:tally()
-	local tally = {}
+--- Returns the inventory's contents indexed by item name
+---@return {[string]: Slot}
+function Inventory:byName()
+	local byName = {}
 	local contents = self.accessor()
 	for _,v in pairs(contents) do
-		if tally[v.name] then
-			tally[v.name] = tally[v.name] + v.count
+		if byName[v.name] then
+			byName[v.name].count = byName[v.name].count + v.count
 		else
-			tally[v.name] = v.count
+			byName[v.name] = table.clone(v, true)
 		end
 	end
 
-	return tally
+	return byName
+end
+
+---Returns a simplified representation of the inventory's contents
+---
+---Stacks of a same item get merged up. Maximum stack size becomes inaccurate, but each item only appears once
+---@return Slot[]
+function Inventory:simplifyContents()
+	local byName = self:byName()
+
+	local tmp = {}
+	for _,v in pairs(byName) do
+		table.insert(tmp, v)
+	end
+	return tmp
+end
+
+---Returns a string representation of the inventory that can be used to quickly test for equality with a slew of other inventories. 
+---If the contents are equal in amounts, regardless of slot positionment, their hash will be equal
+---@return Comparable
+function Inventory:hash()
+	local contents = self:simplifyContents()
+	table.sort(contents, function(a,b) return a.name < b.name end)
+	return textutils.serializeJSON(contents)
 end
 
 ---Test for equality between this inventory and another
